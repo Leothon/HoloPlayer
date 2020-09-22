@@ -1,0 +1,3 @@
+include ':holo'
+include ':app'
+rootProject.name = "HoloPlayer"
