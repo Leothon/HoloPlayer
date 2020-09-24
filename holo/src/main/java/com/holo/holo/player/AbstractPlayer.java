@@ -147,9 +147,9 @@ public abstract class AbstractPlayer {
     public abstract void setLooping(boolean isLooping);
 
     /**
-     * 设置其他播放器配置
+     * 设置播放器配置
      */
-    public abstract void setOtherOptions();
+    public abstract void setOptions();
 
     /**
      * 设置播放速度

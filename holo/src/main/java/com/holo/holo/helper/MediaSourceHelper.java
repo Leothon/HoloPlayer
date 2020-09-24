@@ -43,17 +43,17 @@ public final class MediaSourceHelper {
         mUserAgent = Util.getUserAgent(mApplicationContext,mApplicationContext.getApplicationInfo().name);
     }
 
-    private static volatile MediaSourceHelper mInstance = null;
+    private static volatile MediaSourceHelper sInstance = null;
 
     public static MediaSourceHelper getInstance(Context context) {
-        if (mInstance == null) {
+        if (sInstance == null) {
             synchronized (MediaSourceHelper.class){
-                if (mInstance == null){
-                    mInstance = new MediaSourceHelper(context);
+                if (sInstance == null){
+                    sInstance = new MediaSourceHelper(context);
                 }
             }
         }
-        return mInstance;
+        return sInstance;
     }
 
     public MediaSource getMediaSource(String uri) {
