@@ -5,8 +5,24 @@ import android.content.res.AssetFileDescriptor;
 import android.view.Surface;
 import android.view.SurfaceHolder;
 
+import com.google.android.exoplayer2.DefaultLoadControl;
+import com.google.android.exoplayer2.DefaultRenderersFactory;
+import com.google.android.exoplayer2.LoadControl;
 import com.google.android.exoplayer2.Player;
+import com.google.android.exoplayer2.RenderersFactory;
+import com.google.android.exoplayer2.SimpleExoPlayer;
+import com.google.android.exoplayer2.analytics.AnalyticsCollector;
+import com.google.android.exoplayer2.source.MediaSource;
+import com.google.android.exoplayer2.trackselection.DefaultTrackSelector;
+import com.google.android.exoplayer2.trackselection.MappingTrackSelector;
+import com.google.android.exoplayer2.trackselection.TrackSelector;
+import com.google.android.exoplayer2.upstream.DefaultBandwidthMeter;
+import com.google.android.exoplayer2.util.Clock;
+import com.google.android.exoplayer2.util.EventLogger;
+import com.google.android.exoplayer2.util.Util;
 import com.google.android.exoplayer2.video.VideoListener;
+import com.holo.holo.base.HoloPlayerManager;
+import com.holo.holo.config.HoloPlayerConfig;
 import com.holo.holo.helper.MediaSourceHelper;
 
 import java.util.Map;
@@ -21,6 +37,12 @@ public class MediaPlayer extends AbstractPlayer implements VideoListener, Player
     private Context mApplicationContext;
 
     private MediaSourceHelper mMediaSourceHelper;
+    private MediaSource mMediaSource;
+
+    public SimpleExoPlayer mMediaInternalPlayer;    // 播放器核心
+    private RenderersFactory mRenderersFactory;     // 渲染工厂
+    private TrackSelector mTrackSelector;           // 音轨选择器
+    private LoadControl mLoadControl;               // 播放流控制
 
     public MediaPlayer(Context context){
         mApplicationContext = context.getApplicationContext();
@@ -29,7 +51,25 @@ public class MediaPlayer extends AbstractPlayer implements VideoListener, Player
 
     @Override
     public void initPlayer() {
+        mMediaInternalPlayer = new SimpleExoPlayer.Builder(
+                mApplicationContext,
+                mRenderersFactory == null ? mRenderersFactory = new DefaultRenderersFactory(mApplicationContext) : mRenderersFactory,
+                mTrackSelector == null ? mTrackSelector = new DefaultTrackSelector(mApplicationContext) : mTrackSelector,
+                mLoadControl == null ? mLoadControl = new DefaultLoadControl() : mLoadControl,
+                DefaultBandwidthMeter.getSingletonInstance(mApplicationContext),                       // 带宽控制
+                Util.getLooper(),
+                new AnalyticsCollector(Clock.DEFAULT),                                                 // 分析收集器
+                true,
+                Clock.DEFAULT)
+                .build();
+        setOptions();
+        // 日志
+        if (HoloPlayerManager.getConfig().mIsEnableLog && mTrackSelector instanceof MappingTrackSelector) {
+            mMediaInternalPlayer.addAnalyticsListener(new EventLogger((MappingTrackSelector) mTrackSelector,"internal_player"));
+        }
 
+        mMediaInternalPlayer.addListener(this);
+        mMediaInternalPlayer.addVideoListener(this);
     }
 
     @Override
@@ -123,8 +163,9 @@ public class MediaPlayer extends AbstractPlayer implements VideoListener, Player
     }
 
     @Override
-    public void setOtherOptions() {
-
+    public void setOptions() {
+        // 当准备好就开始播放
+        mMediaInternalPlayer.setPlayWhenReady(true);
     }
 
     @Override
