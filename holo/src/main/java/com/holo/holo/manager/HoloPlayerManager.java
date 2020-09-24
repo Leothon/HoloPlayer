@@ -1,4 +1,4 @@
-package com.holo.holo.base;
+package com.holo.holo.manager;
 
 import android.app.Application;
 import android.util.Log;
