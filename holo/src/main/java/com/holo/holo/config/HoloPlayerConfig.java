@@ -3,7 +3,7 @@ package com.holo.holo.config;
 import com.holo.holo.controller.OnVideoPlayListener;
 import com.holo.holo.factory.PlayerFactory;
 import com.holo.holo.factory.RenderViewFactory;
-import com.holo.holo.helper.PlayerProgressManager;
+import com.holo.holo.manager.PlayerProgressManager;
 
 /**
  * @Author: a10943

@@ -21,8 +21,7 @@ import com.google.android.exoplayer2.util.Clock;
 import com.google.android.exoplayer2.util.EventLogger;
 import com.google.android.exoplayer2.util.Util;
 import com.google.android.exoplayer2.video.VideoListener;
-import com.holo.holo.base.HoloPlayerManager;
-import com.holo.holo.config.HoloPlayerConfig;
+import com.holo.holo.manager.HoloPlayerManager;
 import com.holo.holo.helper.MediaSourceHelper;
 
 import java.util.Map;
