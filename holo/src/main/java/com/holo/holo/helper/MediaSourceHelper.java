@@ -1,6 +1,7 @@
 package com.holo.holo.helper;
 
 import android.content.Context;
+import android.content.res.AssetFileDescriptor;
 import android.net.Uri;
 import android.text.TextUtils;
 
@@ -66,6 +67,16 @@ public final class MediaSourceHelper {
 
     public MediaSource getMediaSource(String uri, Map<String,String> headers) {
         return getMediaSource(uri,headers,false);
+    }
+
+    /**
+     * TODO 暂不支持从本地获取到资源，待以后解决
+     * @param afd
+     * @return
+     */
+    @Deprecated
+    public MediaSource getMediaSource(AssetFileDescriptor afd) {
+        return null;
     }
 
     /**
