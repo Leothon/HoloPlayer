@@ -8,6 +8,8 @@ import android.widget.MediaController;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 
+import com.holo.holo.factory.PlayerFactory;
+
 /**
  * @Author: a10943
  * @Date: 2020/9/24
@@ -15,6 +17,9 @@ import androidx.annotation.Nullable;
  */
 public class HoloVideoPlayer<P extends AbstractPlayer> extends FrameLayout implements MediaController.MediaPlayerControl,AbstractPlayer.PlayerEventListener {
 
+    protected P mMediaPlayer;
+    protected PlayerFactory<P> mPlayerFactory;
+    protected
 
     public HoloVideoPlayer(@NonNull Context context) {
         super(context);
