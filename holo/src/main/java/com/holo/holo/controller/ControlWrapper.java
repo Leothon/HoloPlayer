@@ -105,8 +105,8 @@ public class ControlWrapper implements MediaPlayerControl,IVideoController{
     }
 
     @Override
-    public long getDurationPosition() {
-        return mMediaPlayerControl.getDurationPosition();
+    public long getCurrentPosition() {
+        return mMediaPlayerControl.getCurrentPosition();
     }
 
     @Override
