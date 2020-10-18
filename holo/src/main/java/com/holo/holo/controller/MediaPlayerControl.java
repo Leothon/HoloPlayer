@@ -15,7 +15,7 @@ public interface MediaPlayerControl {
 
     long getDuration();
 
-    long getDurationPosition();
+    long getCurrentPosition();
 
     void seekTo(long pos);
 

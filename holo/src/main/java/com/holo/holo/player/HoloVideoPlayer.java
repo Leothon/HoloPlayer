@@ -19,7 +19,25 @@ public class HoloVideoPlayer<P extends AbstractPlayer> extends FrameLayout imple
 
     protected P mMediaPlayer;
     protected PlayerFactory<P> mPlayerFactory;
-    protected
+
+    public static final int PLAYER_NORMAL = 10;        // 普通播放器
+    public static final int PLAYER_FULL_SCREEN = 11;   // 全屏播放器
+    public static final int PLAYER_TINY_SCREEN = 12;   // 小屏播放器
+    public static final int PLAYER_PENDING_FULL_SCREEN = 13; // 即将全屏
+    public static final int PLAYER_PENDING_NORMAL = 14; // 即将普通
+
+    //播放器的各种状态
+    public static final int STATE_ERROR = -1;
+    public static final int STATE_IDLE = 0;
+    public static final int STATE_PREPARING = 1;
+    public static final int STATE_PREPARED = 2;
+    public static final int STATE_PLAYING = 3;
+    public static final int STATE_PAUSED = 4;
+    public static final int STATE_PLAYBACK_COMPLETED = 5;
+    public static final int STATE_BUFFERING = 6;
+    public static final int STATE_BUFFERED = 7;
+    public static final int STATE_START_ABORT = 8;//开始播放中止
+    public static final int STATE_START_EXTRA = 9;// 片头广告
 
     public HoloVideoPlayer(@NonNull Context context) {
         super(context);

@@ -105,8 +105,8 @@ public class ControlWrapper implements MediaPlayerControl,IVideoController{
     }
 
     @Override
-    public long getDurationPosition() {
-        return mMediaPlayerControl.getDurationPosition();
+    public long getCurrentPosition() {
+        return mMediaPlayerControl.getCurrentPosition();
     }
 
     @Override
@@ -136,7 +136,7 @@ public class ControlWrapper implements MediaPlayerControl,IVideoController{
 
     public void setPlayerState(int state) {
         if (mMediaPlayerControl instanceof HoloVideoPlayer) {
-            ((HoloVideoPlayer)mMediaPlayerControl).setPlayerState(state);
+            //((HoloVideoPlayer)mMediaPlayerControl).setPlayerState(state);
         }
     }
 
