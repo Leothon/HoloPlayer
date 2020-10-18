@@ -23,6 +23,8 @@ public class HoloVideoPlayer<P extends AbstractPlayer> extends FrameLayout imple
     public static final int PLAYER_NORMAL = 10;        // 普通播放器
     public static final int PLAYER_FULL_SCREEN = 11;   // 全屏播放器
     public static final int PLAYER_TINY_SCREEN = 12;   // 小屏播放器
+    public static final int PLAYER_PENDING_FULL_SCREEN = 13; // 即将全屏
+    public static final int PLAYER_PENDING_NORMAL = 14; // 即将普通
 
     //播放器的各种状态
     public static final int STATE_ERROR = -1;

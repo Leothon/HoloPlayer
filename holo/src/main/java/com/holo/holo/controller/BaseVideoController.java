@@ -2,6 +2,7 @@ package com.holo.holo.controller;
 
 import android.app.Activity;
 import android.content.Context;
+import android.content.pm.ActivityInfo;
 import android.util.AttributeSet;
 import android.view.LayoutInflater;
 import android.view.OrientationEventListener;
@@ -251,6 +252,160 @@ public abstract class BaseVideoController extends FrameLayout implements  IVideo
             if (mHasCutout) {
                 mCutoutHeight = (int) CommonUtils.getStatusBarHeight(mActivity);
             }
+        }
+    }
+
+    @Override
+    public boolean hasCutout() {
+        return mHasCutout != null && mHasCutout;
+    }
+
+    @Override
+    public int getCutoutHeight() {
+        return mCutoutHeight;
+    }
+
+    // 是否显示网络播放提示，在是移动网络且移动网络不让播放时候显示
+    public boolean showNetWarning() {
+        return CommonUtils.getNetworkType(getContext()) == CommonUtils.NETWORK_MOBILE && !HoloPlayerManager.getInstance().isPlayOnMobileNetwork();
+    }
+
+    /**
+     * 开头额外处理？
+     * @return
+     */
+    public boolean showStartExtra() {
+        return mStartExtraNeed;
+    }
+
+    public void setStartExtraNeed(boolean done) {
+        mStartExtraNeed = done;
+    }
+
+
+    protected void togglePlay() {
+        controlWrapper.togglePlay();
+    }
+
+    protected void toggleFullScreen() {
+        controlWrapper.toggleFullScreen(mActivity);
+    }
+
+    /**
+     * 子类使用该方法进入全屏
+     * @return
+     */
+    protected boolean startFullScreen() {
+        if (mActivity == null || mActivity.isFinishing()) return false;
+        setPlayerState(HoloVideoPlayer.PLAYER_FULL_SCREEN);
+        mActivity.setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE);
+        controlWrapper.startFullScreen();
+        return true;
+    }
+
+    protected boolean stopFullScreen() {
+        if (mActivity == null || mActivity.isFinishing()) return false;
+        controlWrapper.setPlayerState(HoloVideoPlayer.PLAYER_PENDING_NORMAL);
+        mActivity.setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_PORTRAIT);
+        controlWrapper.stopFullScreen();
+        return true;
+    }
+
+    public boolean onBackPressed() {
+        return false;
+    }
+
+    /**
+     * 用户焦点改变调用
+     * @param hasWindowFocus
+     */
+    @Override
+    public void onWindowFocusChanged(boolean hasWindowFocus) {
+        super.onWindowFocusChanged(hasWindowFocus);
+        if (controlWrapper.isPlaying() || controlWrapper.isFullScreen()){
+            if (hasWindowFocus) {
+                postDelayed(new Runnable() {
+                    @Override
+                    public void run() {
+                        orientationHelper.enable();
+                    }
+                },800);
+            } else {
+                orientationHelper.disable();
+            }
+        }
+    }
+
+    public void setEnableOrientation(boolean enableOrientation) {
+        mEnableOrientation = enableOrientation;
+    }
+
+    @CallSuper
+    @Override
+    public void onOrientationChanged(int orientation) {
+        if (mActivity == null || mActivity.isFinishing()) return;
+
+        // 记录上一次放置的位置
+        int lastOrientation = mOrientation;
+
+        // 检测不到方向（手机平放，重置原始位置）
+        if (orientation == OrientationEventListener.ORIENTATION_UNKNOWN) {
+            mOrientation = -1;
+            return;
+        }
+
+        if (orientation > 350 || orientation < 10) {
+            int o = mActivity.getRequestedOrientation();
+            if (o == ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE && lastOrientation == 0) return;
+            if (mOrientation == 0) return;
+            mOrientation = 0;
+            // 手机回正
+            onOrientationPortrait(mActivity);
+        } else if (orientation > 80 && orientation < 100) {
+            int o = mActivity.getRequestedOrientation();
+
+            if (o == ActivityInfo.SCREEN_ORIENTATION_PORTRAIT && lastOrientation == 90) return;
+            if (mOrientation == 90) return;
+            mOrientation = 90;
+            // 手机右横屏，反转横屏
+            onOrientationReverseLandscape(mActivity);
+        } else if (orientation > 260 && orientation < 280) {
+            int o = mActivity.getRequestedOrientation();
+            if (o == ActivityInfo.SCREEN_ORIENTATION_PORTRAIT && lastOrientation == 270) return;
+            if (mOrientation == 270) return;
+            mOrientation = 270;
+            // 手机左横屏，横屏
+            mOrientation = 270;
+            onOrientationLandScape(mActivity);
+        }
+    }
+
+    /**
+     * 竖屏
+     * @param activity
+     */
+    protected void onOrientationPortrait(Activity activity) {
+        if (mIsLocking) return;
+        if (!mEnableOrientation) return;
+        activity.setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_PORTRAIT);
+        controlWrapper.stopFullScreen();
+    }
+
+    protected void onOrientationLandScape(Activity activity) {
+        activity.setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE);
+        if (controlWrapper.isFullScreen()) {
+            handlePlayerStateChanged(HoloVideoPlayer.PLAYER_FULL_SCREEN);
+        } else {
+            controlWrapper.startFullScreen();
+        }
+    }
+
+    protected void onOrientationReverseLandscape(Activity activity) {
+        activity.setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_REVERSE_LANDSCAPE);
+        if (controlWrapper.isFullScreen()) {
+            handlePlayerStateChanged(HoloVideoPlayer.PLAYER_FULL_SCREEN);
+        } else {
+            controlWrapper.startFullScreen();
         }
     }
 
