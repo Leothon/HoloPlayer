@@ -15,6 +15,7 @@ import androidx.annotation.CallSuper;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 
+import com.holo.holo.helper.OrientationHelper;
 import com.holo.holo.manager.HoloPlayerManager;
 import com.holo.holo.player.HoloVideoPlayer;
 import com.holo.holo.utils.CommonUtils;
