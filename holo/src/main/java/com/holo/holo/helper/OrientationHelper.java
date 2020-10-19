@@ -1,4 +1,4 @@
-package com.holo.holo.controller;
+package com.holo.holo.helper;
 
 import android.content.Context;
 import android.view.OrientationEventListener;
