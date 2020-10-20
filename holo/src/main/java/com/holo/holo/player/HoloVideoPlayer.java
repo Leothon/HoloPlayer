@@ -1,12 +1,15 @@
 package com.holo.holo.player;
 
+import android.content.ContentResolver;
 import android.content.Context;
 import android.content.res.AssetFileDescriptor;
 import android.graphics.Bitmap;
 import android.graphics.Color;
+import android.net.Uri;
+import android.text.TextUtils;
 import android.util.AttributeSet;
+import android.view.ViewGroup;
 import android.widget.FrameLayout;
-import android.widget.MediaController;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
@@ -16,11 +19,12 @@ import com.holo.holo.controller.BaseVideoController;
 import com.holo.holo.controller.MediaPlayerControl;
 import com.holo.holo.controller.OnVideoPlayListener;
 import com.holo.holo.factory.PlayerFactory;
-import com.holo.holo.factory.RenderViewFactory;
 import com.holo.holo.helper.AudioFocusHelper;
 import com.holo.holo.manager.HoloPlayerManager;
 import com.holo.holo.manager.PlayerProgressManager;
 import com.holo.holo.render.IRenderView;
+import com.holo.holo.render.RenderViewFactory;
+import com.holo.holo.utils.CommonUtils;
 
 import java.util.List;
 import java.util.Map;
@@ -139,7 +143,14 @@ public class HoloVideoPlayer<P extends AbstractPlayer> extends FrameLayout imple
     }
 
     protected void initView() {
+        mPlayerContainer = new FrameLayout(getContext());
+        mPlayerContainer.setBackgroundColor(mPlayerBackgroundColor);
+        LayoutParams params = new LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,LayoutParams.MATCH_PARENT);
+        this.addView(mPlayerContainer,params);
+    }
 
+    public void setPlayerBackgroundColor(int color) {
+        mPlayerContainer.setBackgroundColor(color);
     }
 
 
@@ -151,7 +162,91 @@ public class HoloVideoPlayer<P extends AbstractPlayer> extends FrameLayout imple
 
     @Override
     public void start() {
+        boolean isStarted = false;
+        if (!isInIdleState() || isInStartAbortState() || isInStartExtraState()) {
+            isStarted = startPlay();
+        }
+    }
 
+    protected boolean startPlay() {
+        if (showNetWarning()) {
+            //setPlayState()
+        }
+        return false;
+    }
+
+    public void release() {
+
+    }
+
+    public boolean onBackPressed() {
+        return false;
+    }
+
+    public void setPlayerState(int state) {
+
+    }
+    protected void setPlayState(int playState) {
+        mCurrentPlayState = playState;
+        if (mVideoController != null) {
+            mVideoController.setPlayState(playState);
+        }
+        if (mOnStateChangeListeners != null) {
+            for (OnStateChangeListener listener : CommonUtils.getSnapshot(mOnStateChangeListeners)) {
+                if (listener != null) {
+                    listener.playStateChanged(playState);
+                }
+            }
+        }
+
+        if (mLastPlayingStatus != isPlaying()) {
+            mLastPlayingStatus = isPlaying();
+            if (mOnVideoPlayerListener != null) {
+                //int source = (this instanceof TinyVideoPlayer) ? Task;
+                //mOnVideoPlayerListener.onVideoPlayChanged(mLastPlayingStatus,source);
+            }
+        }
+    }
+
+    protected boolean showNetWarning() {
+        if (isLocalDataSource()) return false;
+        return mVideoController != null && mVideoController.showNetWarning();
+    }
+
+    protected boolean isLocalDataSource() {
+        if (mAssetFileDescriptor != null) {
+            return true;
+        } else if (!TextUtils.isEmpty(mUrl)) {
+            Uri uri = Uri.parse(mUrl);
+            return ContentResolver.SCHEME_ANDROID_RESOURCE.equals(uri.getScheme()) || ContentResolver.SCHEME_FILE.equals(uri.getScheme()) || "rawresource".equals(uri.getScheme());
+        }
+        return false;
+    }
+
+    // 是否处于未播放状态
+    protected boolean isInIdleState() {
+        return mCurrentPlayState == STATE_IDLE;
+    }
+
+    // 播放中止状态
+    private boolean isInStartAbortState() {
+        return mCurrentPlayState == STATE_START_ABORT;
+    }
+
+    // 开始播放开头任务（广告）
+    private boolean isInStartExtraState() {
+        return mCurrentPlayState == STATE_START_EXTRA;
+    }
+
+    // 是否处于播放状态
+    protected boolean isInPlaybackState() {
+        return mMediaPlayer != null
+                && mCurrentPlayState != STATE_ERROR
+                && mCurrentPlayState != STATE_IDLE
+                && mCurrentPlayState != STATE_PREPARING
+                && mCurrentPlayState != STATE_START_ABORT
+                && mCurrentPlayState != STATE_START_EXTRA
+                && mCurrentPlayState != STATE_PLAYBACK_COMPLETED;
     }
 
     @Override

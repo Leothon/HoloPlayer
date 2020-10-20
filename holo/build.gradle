@@ -32,4 +32,6 @@ dependencies {
     def exo_version = "2.11.6"
     implementation "com.google.android.exoplayer:exoplayer-core:$exo_version"
     implementation "com.google.android.exoplayer:exoplayer-hls:$exo_version"
+
+    implementation 'com.facebook.fresco:fresco:0.12.0'
 }
