@@ -8,7 +8,7 @@ import android.content.Context;
  * Version: 1.0.0
  * Description:创建textureRenderView的工厂类
  */
-class TextureRenderViewFactory extends RenderViewFactory{
+public class TextureRenderViewFactory extends RenderViewFactory{
 
     public static TextureRenderViewFactory create() {
         return new TextureRenderViewFactory();

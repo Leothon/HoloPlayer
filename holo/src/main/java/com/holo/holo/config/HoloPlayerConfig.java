@@ -1,9 +1,11 @@
 package com.holo.holo.config;
 
 import com.holo.holo.controller.OnVideoPlayListener;
+import com.holo.holo.factory.MediaPlayerFactory;
 import com.holo.holo.factory.PlayerFactory;
-import com.holo.holo.factory.RenderViewFactory;
 import com.holo.holo.manager.PlayerProgressManager;
+import com.holo.holo.render.RenderViewFactory;
+import com.holo.holo.render.TextureRenderViewFactory;
 
 /**
  * @Author: a10943
@@ -37,15 +39,22 @@ public class HoloPlayerConfig {
     public OnVideoPlayListener mOnVideoPlayListener;
 
     private HoloPlayerConfig(Builder builder) {
-        mPlayerFactory = builder.mPlayFactory;
+        if (builder.mPlayFactory == null) {
+            mPlayerFactory = MediaPlayerFactory.create();
+        } else {
+            mPlayerFactory = builder.mPlayFactory;
+        }
         mPlayOnMobileNetwork = builder.mPlayOnMobileNetwork;
         mEnableAudioFocus = builder.mEnableAudioFocus;
         mEnableOrientation = builder.mEnableOrientation;
         mIsEnableLog = builder.mIsEnableLog;
         mPlayerProgressManager = builder.mPlayerProgressManager;
         mScreenScaleType = builder.mScreenScaleType;
-        // TODO 需要切换不同的渲染view，SurfaceView还是TextureView
-        mRenderViewFactory = builder.mRenderViewFactory;
+        if (builder.mRenderViewFactory == null) {
+            mRenderViewFactory = TextureRenderViewFactory.create();
+        } else {
+            mRenderViewFactory = builder.mRenderViewFactory;
+        }
         mAdaptCutout = builder.mAdaptCutout;
         mOnVideoPlayListener = builder.mOnVideoPlayListener;
     }
