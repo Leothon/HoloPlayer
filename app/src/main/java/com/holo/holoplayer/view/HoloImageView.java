@@ -14,6 +14,7 @@ import androidx.annotation.Nullable;
 import androidx.core.content.ContextCompat;
 
 import com.holo.holoplayer.R;
+import com.holo.holoplayer.utils.DensityUtils;
 
 /**
  * Author: wangchengge
@@ -55,7 +56,7 @@ public class HoloImageView extends View {
     @Override
     protected void onMeasure(int widthMeasureSpec, int heightMeasureSpec) {
         super.onMeasure(widthMeasureSpec,heightMeasureSpec);
-        width = getMeasuredWidth();
+        width = DensityUtils.getScreenWidth(getContext());
         height = (int) (width * imageRatio);
     }
 
