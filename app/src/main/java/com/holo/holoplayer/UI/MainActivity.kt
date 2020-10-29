@@ -14,12 +14,16 @@ class MainActivity : AppCompatActivity(), View.OnClickListener {
         mBinding = ActivityMainBinding.inflate(layoutInflater)
         setContentView(mBinding?.root)
         mBinding?.toDrawView?.setOnClickListener(this)
+        mBinding?.toAudio?.setOnClickListener(this)
     }
 
     override fun onClick(v: View?) {
        when(v) {
            mBinding?.toDrawView -> {
                DrawImageActivity.start(this)
+           }
+           mBinding?.toAudio -> {
+               AudioHandleActivity.start(this)
            }
        }
     }
