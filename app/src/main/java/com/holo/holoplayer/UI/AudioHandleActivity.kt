@@ -4,19 +4,16 @@ import android.Manifest
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
-import android.media.AudioFormat
-import android.media.AudioRecord
-import android.media.MediaRecorder
+import android.media.*
 import android.os.Bundle
+import android.os.Process
 import android.view.View
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.app.ActivityCompat
 import com.holo.holoplayer.databinding.ActivityAudioHandleBinding
 import com.holo.holoplayer.utils.PcmToWavUtil
-import java.io.File
-import java.io.FileNotFoundException
-import java.io.FileOutputStream
-import java.io.IOException
+import java.io.*
+import java.lang.Exception
 
 /**
  * AudioRecord负责采集PCM数据，AudioTrack负责播放PCM数据
@@ -35,15 +32,53 @@ class AudioHandleActivity : AppCompatActivity() {
     private var permissions: Array<String>? = arrayOf(Manifest.permission.RECORD_AUDIO,Manifest.permission.READ_EXTERNAL_STORAGE,Manifest.permission.WRITE_EXTERNAL_STORAGE)
     private var mBinding: ActivityAudioHandleBinding? = null
 
+    // 录音缓冲区
     private var mRecordBufferSize: Int? = null
+    // 播放缓冲区
+    private var mMinBufferSize: Int? = null
 
     private var mAudioRecord: AudioRecord? = null
 
     private var mIsRecord: Boolean = false
     private var pcmFile: File? = null
 
+    private var mAudioTrack: AudioTrack? = null
+    private var mDataInputStream: DataInputStream? = null
+    private var mRecordThread: Thread? = null
+    private var isStart: Boolean = false
+
+
+
     companion object{
-        public fun start(context: Context) {
+
+        /**
+        AudioManager.STREAM_MUSIC：用于音乐播放的音频流。
+        AudioManager.STREAM_SYSTEM：用于系统声音的音频流。
+        AudioManager.STREAM_RING：用于电话铃声的音频流。
+        AudioManager.STREAM_VOICE_CALL：用于电话通话的音频流。
+        AudioManager.STREAM_ALARM：用于警报的音频流。
+        AudioManager.STREAM_NOTIFICATION：用于通知的音频流。
+        AudioManager.STREAM_BLUETOOTH_SCO：用于连接到蓝牙电话时的手机音频流。
+        AudioManager.STREAM_SYSTEM_ENFORCED：在某些国家实施的系统声音的音频流。
+        AudioManager.STREAM_DTMF：DTMF音调的音频流。
+        AudioManager.STREAM_TTS：文本到语音转换（TTS）的音频流。
+         */
+        private const val mStreamType: Int = AudioManager.STREAM_MUSIC
+
+        /**
+        AudioTrack.MODE_STREAM
+        STREAM的意思是由用户在应用程序通过write方式把数据一次一次得写到AudioTrack中。
+        这个和我们在socket中发送数据一样，应用层从某个地方获取数据，例如通过编解码得到PCM数据，然后write到AudioTrack。
+        这种方式的坏处就是总是在JAVA层和Native层交互，效率损失较大。
+
+        AudioTrack.MODE_STATIC
+        STATIC就是数据一次性交付给接收方。
+        好处是简单高效，只需要进行一次操作就完成了数据的传递;
+        缺点当然也很明显，对于数据量较大的音频回放，显然它是无法胜任的，因而通常只用于播放铃声、系统提醒等对内存小的操作
+         */
+        private val mMode = AudioTrack.MODE_STREAM
+
+        fun start(context: Context) {
             context.startActivity(Intent(context,AudioHandleActivity::class.java))
         }
     }
@@ -54,6 +89,8 @@ class AudioHandleActivity : AppCompatActivity() {
         setContentView(mBinding?.root)
         permissions?.let { checkPermission(it) }
         mBinding?.startRecord?.setOnClickListener(onClickListener)
+        mBinding?.startPlay?.setOnClickListener(onClickListener)
+        mBinding?.startPlay?.visibility = View.GONE
     }
 
     private var onClickListener = View.OnClickListener{
@@ -65,12 +102,41 @@ class AudioHandleActivity : AppCompatActivity() {
                     startRecord()
                 }
             }
+            mBinding?.startPlay -> {
+                if (isStart) {
+                    stopPlay()
+                } else {
+                    startPlay(externalCacheDir?.path + "/audioRecord.pcm")
+                }
+            }
         }
     }
 
     private fun permissionGranted() {
         initMinBufferSize()
         initAudioRecord()
+        initAudioTrack()
+    }
+
+    /**
+     * 初始化获取每一帧流的大小
+     */
+    private fun initMinBufferSize() {
+        // 第一个参数，采样率
+        // 第二个参数，声道数.CHANNEL_CONFIGURATION_STEREO 双声道，CHANNEL_IN_MONO 单声道
+        // 第三个参数，采样精度，16比特
+        mRecordBufferSize = AudioRecord.getMinBufferSize(8000,AudioFormat.CHANNEL_IN_MONO,AudioFormat.ENCODING_PCM_16BIT)
+        //指定采样率 （MediaRecorder 的采样率通常是8000Hz AAC的通常是44100Hz。 设置采样率为44100，目前为常用的采样率，官方文档表示这个值可以兼容所有的设置）
+        mMinBufferSize = AudioTrack.getMinBufferSize(44100, AudioFormat.CHANNEL_OUT_MONO, AudioFormat.ENCODING_PCM_16BIT)
+    }
+
+    private fun initAudioRecord() {
+        // 第一个参数，音频源，MIC代表麦克风
+        mAudioRecord = mRecordBufferSize?.let { AudioRecord(MediaRecorder.AudioSource.MIC,8000,AudioFormat.CHANNEL_IN_MONO,AudioFormat.ENCODING_PCM_16BIT, it) }
+    }
+
+    private fun initAudioTrack() {
+        mAudioTrack = mMinBufferSize?.let { AudioTrack(mStreamType,44100,AudioFormat.CHANNEL_OUT_MONO,AudioFormat.ENCODING_PCM_16BIT, it, mMode) }
     }
 
     private var runnable: Runnable = Runnable {
@@ -96,6 +162,31 @@ class AudioHandleActivity : AppCompatActivity() {
             e.printStackTrace()
             mAudioRecord?.stop()
         } catch (e: IOException) {
+            e.printStackTrace()
+        }
+    }
+
+    private var playRunnable = Runnable {
+        try {
+            Process.setThreadPriority(Process.THREAD_PRIORITY_URGENT_AUDIO)
+            var tempBuffer: ByteArray? = mMinBufferSize?.let { ByteArray(it) }
+            var readCount: Int? = 0
+            while (mDataInputStream?.available()!! > 0) {
+                readCount = mDataInputStream?.read(tempBuffer)
+                if (readCount == AudioTrack.ERROR_INVALID_OPERATION || readCount == AudioTrack.ERROR_BAD_VALUE) {
+                    continue;
+                }
+                if (readCount != 0 && readCount != -1) {
+                    // 未初始化
+                    if (mAudioTrack?.state == AudioTrack.STATE_UNINITIALIZED) {
+                        initAudioTrack()
+                    }
+                    mAudioTrack?.play()
+                    readCount?.let { tempBuffer?.let { it1 -> mAudioTrack?.write(it1,0, it) } }
+                }
+            }
+            stopPlay();
+        }catch (e: Exception) {
             e.printStackTrace()
         }
     }
@@ -139,22 +230,57 @@ class AudioHandleActivity : AppCompatActivity() {
         mIsRecord = false
         mBinding?.showRecordStatus?.text = "录制已停止"
         mBinding?.startRecord?.text = "开始录制"
+        mBinding?.startPlay?.visibility = View.VISIBLE
     }
 
-    private fun initAudioRecord() {
-        // 第一个参数，音频源，MIC代表麦克风
-        mAudioRecord = mRecordBufferSize?.let { AudioRecord(MediaRecorder.AudioSource.MIC,8000,AudioFormat.CHANNEL_IN_MONO,AudioFormat.ENCODING_PCM_16BIT, it) }
+    private fun startPlay(path: String) {
+        isStart = true;
+        mBinding?.showRecordStatus?.text = "播放中..."
+        mDataInputStream = DataInputStream(FileInputStream(File(path)))
+        destroyThread()
+        if (mRecordThread == null) {
+            mRecordThread = Thread(playRunnable)
+            mRecordThread?.start()
+        }
     }
 
-    /**
-     * 初始化获取每一帧流的大小
-     */
-    private fun initMinBufferSize() {
-        // 第一个参数，采样率
-        // 第二个参数，声道数.CHANNEL_CONFIGURATION_STEREO 双声道，CHANNEL_IN_MONO 单声道
-        // 第三个参数，采样精度，16比特
-        mRecordBufferSize = AudioRecord.getMinBufferSize(8000,AudioFormat.CHANNEL_IN_MONO,AudioFormat.ENCODING_PCM_16BIT)
+    private fun stopPlay() {
+        runOnUiThread {
+            mBinding?.startPlay?.visibility = View.GONE
+            mBinding?.showRecordStatus?.text = "播放完"
+        }
+        try {
+            destroyThread()
+            if (mAudioTrack?.state == AudioRecord.STATE_INITIALIZED) {
+                mAudioTrack?.stop()
+            }
+            mAudioTrack?.release()
+            mDataInputStream?.close()
+        }catch (e: Exception) {
+            e.printStackTrace()
+        }
     }
+
+
+    private fun destroyThread() {
+        try {
+            isStart = false
+            if(null != mRecordThread && Thread.State.RUNNABLE == mRecordThread?.state) {
+                try {
+                    Thread.sleep(500)
+                    mRecordThread?.interrupt()
+                }catch (e: Exception) {
+                    e.printStackTrace()
+                }
+            }
+            mRecordThread = null
+        }catch (e: Exception) {
+            e.printStackTrace()
+        }finally {
+            mRecordThread = null
+        }
+    }
+
 
 
 
