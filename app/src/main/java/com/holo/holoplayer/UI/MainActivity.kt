@@ -15,6 +15,7 @@ class MainActivity : AppCompatActivity(), View.OnClickListener {
         setContentView(mBinding?.root)
         mBinding?.toDrawView?.setOnClickListener(this)
         mBinding?.toAudio?.setOnClickListener(this)
+        mBinding?.toCamera?.setOnClickListener(this)
     }
 
     override fun onClick(v: View?) {
@@ -24,6 +25,9 @@ class MainActivity : AppCompatActivity(), View.OnClickListener {
            }
            mBinding?.toAudio -> {
                AudioHandleActivity.start(this)
+           }
+           mBinding?.toCamera -> {
+               CameraActivity.start(this)
            }
        }
     }
