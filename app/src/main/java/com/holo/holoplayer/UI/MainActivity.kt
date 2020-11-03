@@ -1,7 +1,9 @@
 package com.holo.holoplayer.UI
 
+import android.os.Build
 import android.os.Bundle
 import android.view.View
+import androidx.annotation.RequiresApi
 import androidx.appcompat.app.AppCompatActivity
 import com.holo.holoplayer.databinding.ActivityMainBinding
 
@@ -16,8 +18,10 @@ class MainActivity : AppCompatActivity(), View.OnClickListener {
         mBinding?.toDrawView?.setOnClickListener(this)
         mBinding?.toAudio?.setOnClickListener(this)
         mBinding?.toCamera?.setOnClickListener(this)
+        mBinding?.toVideo?.setOnClickListener(this)
     }
 
+    @RequiresApi(Build.VERSION_CODES.N)
     override fun onClick(v: View?) {
        when(v) {
            mBinding?.toDrawView -> {
@@ -28,6 +32,9 @@ class MainActivity : AppCompatActivity(), View.OnClickListener {
            }
            mBinding?.toCamera -> {
                CameraActivity.start(this)
+           }
+           mBinding?.toVideo -> {
+               VideoHandleActivity.start(this)
            }
        }
     }

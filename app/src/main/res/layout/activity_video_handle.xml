@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="utf-8"?>
+<androidx.constraintlayout.widget.ConstraintLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    tools:context=".UI.VideoHandleActivity">
+
+    <TextView
+        android:id="@+id/extractor_video"
+        android:layout_width="match_parent"
+        android:layout_height="80dp"
+        android:paddingHorizontal="40dp"
+        android:paddingVertical="10dp"
+        android:gravity="center"
+        android:text="将mp4文件分离成音频aac和视频h264"
+        android:textColor="#ffffff"
+        android:layout_marginVertical="10dp"
+        android:background="@drawable/bg_item_main"
+        app:layout_constraintLeft_toLeftOf="parent"
+        app:layout_constraintRight_toRightOf="parent"
+        app:layout_constraintTop_toTopOf="parent"
+        app:layout_constraintBottom_toTopOf="@+id/merge_video"/>
+
+
+    <TextView
+        android:id="@+id/merge_video"
+        android:layout_width="match_parent"
+        android:layout_height="80dp"
+        android:paddingHorizontal="40dp"
+        android:paddingVertical="10dp"
+        android:gravity="center"
+        android:text="将h264视频和aac音频合并成mp4文件"
+        android:textColor="#ffffff"
+        android:layout_marginVertical="10dp"
+        android:background="@drawable/bg_item_main"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintLeft_toLeftOf="parent"
+        app:layout_constraintRight_toRightOf="parent"
+        app:layout_constraintTop_toBottomOf="@+id/extractor_video" />
+</androidx.constraintlayout.widget.ConstraintLayout>
