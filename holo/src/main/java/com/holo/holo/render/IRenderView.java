@@ -29,7 +29,7 @@ public interface IRenderView {
      * 设置视频旋转角度
      * @param degree 旋转角度
      */
-    void setVideoRatio(int degree);
+    void setVideoRotation(int degree);
 
     /**
      * 设置缩放类型
