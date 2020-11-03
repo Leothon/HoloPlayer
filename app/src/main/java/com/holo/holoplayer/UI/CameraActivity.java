@@ -9,9 +9,14 @@ import android.Manifest;
 import android.content.Context;
 import android.content.Intent;
 import android.content.pm.PackageManager;
+import android.graphics.Canvas;
 import android.graphics.ImageFormat;
+import android.graphics.SurfaceTexture;
 import android.hardware.Camera;
 import android.os.Bundle;
+import android.os.Handler;
+import android.os.Looper;
+import android.os.Message;
 import android.util.Log;
 import android.view.SurfaceHolder;
 import android.view.TextureView;
@@ -114,17 +119,17 @@ public class CameraActivity extends AppCompatActivity {
 
     private void startPreview() throws IOException {
         if (camera != null) {
-            camera.setPreviewDisplay(surfaceHolder);
+            //camera.setPreviewDisplay(surfaceHolder);
+            camera.setPreviewTexture(mBinding.previewTextureView.getSurfaceTexture());
             camera.startPreview();
         }
     }
 
     private void initCamera() {
 
-        surfaceHolder = mBinding.previewSurface.getHolder();
-        surfaceHolder.addCallback(new SurfaceHolder.Callback() {
+        mBinding.previewTextureView.setSurfaceTextureListener(new TextureView.SurfaceTextureListener() {
             @Override
-            public void surfaceCreated(@NonNull SurfaceHolder surfaceHolder) {
+            public void onSurfaceTextureAvailable(@NonNull final SurfaceTexture surfaceTexture, int i, int i1) {
                 if (camera == null) {
                     openCamera(BACK_CAMERA);
                 }
@@ -133,27 +138,70 @@ public class CameraActivity extends AppCompatActivity {
                 } catch (IOException e) {
                     e.printStackTrace();
                 }
-            }
-
-            @Override
-            public void surfaceChanged(@NonNull SurfaceHolder surfaceHolder, int i, int i1, int i2) {
 
                 camera.setPreviewCallback(new Camera.PreviewCallback() {
                     @Override
                     public void onPreviewFrame(byte[] bytes, Camera camera) {
-                        Log.e("相机","change " + bytes);
+                        Log.e("==相机==","change " + bytes);
                     }
                 });
+
             }
 
             @Override
-            public void surfaceDestroyed(@NonNull SurfaceHolder surfaceHolder) {
+            public void onSurfaceTextureSizeChanged(@NonNull SurfaceTexture surfaceTexture, int i, int i1) {
+
+            }
+
+            @Override
+            public boolean onSurfaceTextureDestroyed(@NonNull SurfaceTexture surfaceTexture) {
                 releaseCamera();
+                return false;
+            }
+
+            @Override
+            public void onSurfaceTextureUpdated(@NonNull SurfaceTexture surfaceTexture) {
+
             }
         });
 
 
+
+//        surfaceHolder = mBinding.previewSurface.getHolder();
+//        surfaceHolder.addCallback(new SurfaceHolder.Callback() {
+//            @Override
+//            public void surfaceCreated(@NonNull SurfaceHolder surfaceHolder) {
+//                if (camera == null) {
+//                    openCamera(BACK_CAMERA);
+//                }
+//                try {
+//                    startPreview();
+//                } catch (IOException e) {
+//                    e.printStackTrace();
+//                }
+//            }
+//
+//            @Override
+//            public void surfaceChanged(@NonNull SurfaceHolder surfaceHolder, int i, int i1, int i2) {
+//
+//                camera.setPreviewCallback(new Camera.PreviewCallback() {
+//                    @Override
+//                    public void onPreviewFrame(byte[] bytes, Camera camera) {
+//                        Log.e("相机","change " + bytes);
+//                    }
+//                });
+//            }
+//
+//            @Override
+//            public void surfaceDestroyed(@NonNull SurfaceHolder surfaceHolder) {
+//                releaseCamera();
+//            }
+//        });
+
+
     }
+
+
 
     @Override
     protected void onPause() {
@@ -199,18 +247,18 @@ public class CameraActivity extends AppCompatActivity {
 
     private void permissionGranted() {
         initCamera();
-        mBinding.switchCamera.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View view) {
-                if (info.facing == Front_CAMERA && camera != null) {
-                    releaseCamera();
-                    openCamera(BACK_CAMERA);
-                } else if (info.facing == BACK_CAMERA && camera != null){
-                    releaseCamera();
-                    openCamera(Front_CAMERA);
-                }
-            }
-        });
+//        mBinding.switchCamera.setOnClickListener(new View.OnClickListener() {
+//            @Override
+//            public void onClick(View view) {
+//                if (info.facing == Front_CAMERA && camera != null) {
+//                    releaseCamera();
+//                    openCamera(BACK_CAMERA);
+//                } else if (info.facing == BACK_CAMERA && camera != null){
+//                    releaseCamera();
+//                    openCamera(Front_CAMERA);
+//                }
+//            }
+//        });
     }
 
 }
