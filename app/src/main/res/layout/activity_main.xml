@@ -72,10 +72,26 @@
             android:textColor="#ffffff"
             android:layout_marginVertical="10dp"
             android:background="@drawable/bg_item_main"
-            app:layout_constraintBottom_toBottomOf="parent"
+            app:layout_constraintBottom_toTopOf="@+id/to_open_gl"
             app:layout_constraintLeft_toLeftOf="parent"
             app:layout_constraintRight_toRightOf="parent"
             app:layout_constraintTop_toBottomOf="@+id/to_camera" />
+
+        <TextView
+            android:id="@+id/to_open_gl"
+            android:layout_width="match_parent"
+            android:layout_height="80dp"
+            android:paddingHorizontal="40dp"
+            android:paddingVertical="10dp"
+            android:gravity="center"
+            android:text="openGL Api的使用"
+            android:textColor="#ffffff"
+            android:layout_marginVertical="10dp"
+            android:background="@drawable/bg_item_main"
+            app:layout_constraintBottom_toBottomOf="parent"
+            app:layout_constraintLeft_toLeftOf="parent"
+            app:layout_constraintRight_toRightOf="parent"
+            app:layout_constraintTop_toBottomOf="@+id/to_video" />
 
     </androidx.constraintlayout.widget.ConstraintLayout>
 

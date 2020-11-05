@@ -19,6 +19,7 @@ class MainActivity : AppCompatActivity(), View.OnClickListener {
         mBinding?.toAudio?.setOnClickListener(this)
         mBinding?.toCamera?.setOnClickListener(this)
         mBinding?.toVideo?.setOnClickListener(this)
+        mBinding?.toOpenGl?.setOnClickListener(this)
     }
 
     @RequiresApi(Build.VERSION_CODES.N)
@@ -35,6 +36,9 @@ class MainActivity : AppCompatActivity(), View.OnClickListener {
            }
            mBinding?.toVideo -> {
                VideoHandleActivity.start(this)
+           }
+           mBinding?.toOpenGl -> {
+               OpenGlEsActivity.start(this)
            }
        }
     }
