@@ -6,6 +6,10 @@ import android.opengl.GLSurfaceView;
 import android.util.AttributeSet;
 import android.util.Log;
 
+import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
+import java.nio.FloatBuffer;
+
 import javax.microedition.khronos.egl.EGLConfig;
 import javax.microedition.khronos.opengles.GL10;
 
@@ -94,18 +98,93 @@ public class HoloGLSurfaceView extends GLSurfaceView implements GLSurfaceView.Re
         return shaderObjectId;
     }
 
+    public void makeProgram(String vertexShader,String fragmentShader) {
+        // 编译顶点着色器
+        int vertexShaderId = compileVertexShader(vertexShader);
+        // 编译片元着色器
+        int fragmentShaderId = compileFragmentShader(fragmentShader);
+        program = linkProgram(vertexShaderId,fragmentShaderId);
+
+        validateProgram(program);
+        // OpenGL 开始使用
+        GLES20.glUseProgram(program);
+
+    }
+
+    private int linkProgram(int vertexShaderId,int fragmentShaderId) {
+        // 创建一个OpenGL程序对象
+        int programObjectId = GLES20.glCreateProgram();
+        // 获取创建状态
+        if (programObjectId == 0) {
+            Log.e("OpenGl对象状态","不能创建程序对象");
+            return 0;
+        }
+
+        // 将顶点着色器依附到OpenGl程序对象
+        GLES20.glAttachShader(programObjectId,vertexShaderId);
+        // 将片段着色器依附到OpenGl程序对象
+        GLES20.glAttachShader(programObjectId,fragmentShaderId);
+        // 链接
+        GLES20.glLinkProgram(programObjectId);
+
+        // 获取链接状态
+        int[] linkStatus = new int[1];
+        GLES20.glGetProgramiv(programObjectId,GLES20.GL_LINK_STATUS,linkStatus,0);
+        Log.e("链接状态",GLES20.glGetProgramInfoLog(programObjectId));
+
+        if (linkStatus[0] == 0) {
+            GLES20.glDeleteShader(programObjectId);
+            Log.e("链接状态","链接失败");
+            return 0;
+        }
+        return programObjectId;
+    }
+
+    private boolean validateProgram(int programObjectId) {
+        GLES20.glValidateProgram(programObjectId);
+        int[] validateStatus = new int[1];
+        GLES20.glGetProgramiv(programObjectId,GLES20.GL_VALIDATE_STATUS,validateStatus,0);
+        Log.e("验证程序状态",GLES20.glGetProgramInfoLog(programObjectId));
+        return validateStatus[0] != 0;
+    }
+
+    // 创建一个floatBuffer
+    private FloatBuffer createFloatBuffer(float[] array) {
+        FloatBuffer buffer = ByteBuffer
+                // 分配顶点坐标分量个数 * Float占的byte位数
+                .allocate(array.length * BYTES_PER_FLOAT)
+                // 按照本地字节序排序
+                .order(ByteOrder.nativeOrder())
+                // Byte类型转Float类型
+                .asFloatBuffer();
+        buffer.put(array);
+        return buffer;
+    }
+
+    int aPositionLocation;
+    int uColorLocation;
+    int program;
+
+    public static final int BYTES_PER_FLOAT = 4;
 
     public HoloGLSurfaceView(Context context) {
         super(context);
+        init();
     }
 
     public HoloGLSurfaceView(Context context, AttributeSet attrs) {
         super(context, attrs);
+        init();
+    }
+
+    private void init() {
+        makeProgram(VERTEX_SHADER,FRAGMENT_SHADER);
     }
 
     @Override
     public void onSurfaceCreated(GL10 gl10, EGLConfig eglConfig) {
-
+        aPositionLocation = GLES20.glGetAttribLocation(program,"A_POSITION");
+        uColorLocation = GLES20.glGetAttribLocation(program,"U_COLOR");
     }
 
     @Override
