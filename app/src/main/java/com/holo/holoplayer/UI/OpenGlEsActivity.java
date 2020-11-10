@@ -7,6 +7,7 @@ import android.content.Intent;
 import android.os.Bundle;
 
 import com.holo.holoplayer.databinding.ActivityOpenGlEsBinding;
+import com.holo.holoplayer.view.Holo2GLSurfaceView;
 
 /**
  *
@@ -30,13 +31,16 @@ public class OpenGlEsActivity extends AppCompatActivity {
         context.startActivity(new Intent(context,OpenGlEsActivity.class));
     }
 
-    private ActivityOpenGlEsBinding mBinding;
+    //private ActivityOpenGlEsBinding mBinding;
+
+    private Holo2GLSurfaceView holo2GLSurfaceView;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        mBinding = ActivityOpenGlEsBinding.inflate(getLayoutInflater());
-        setContentView(mBinding.getRoot());
+        ///mBinding = ActivityOpenGlEsBinding.inflate(getLayoutInflater());
+        holo2GLSurfaceView = new Holo2GLSurfaceView(this);
+        setContentView(holo2GLSurfaceView);
     }
 
 
