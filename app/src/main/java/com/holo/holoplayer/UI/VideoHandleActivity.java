@@ -6,8 +6,10 @@ import androidx.appcompat.app.AppCompatActivity;
 import android.content.Context;
 import android.content.Intent;
 import android.content.res.AssetFileDescriptor;
+import android.media.MediaCodec;
 import android.media.MediaExtractor;
 import android.media.MediaFormat;
+import android.media.MediaMuxer;
 import android.os.Build;
 import android.os.Bundle;
 import android.util.Log;
@@ -24,6 +26,10 @@ import java.nio.ByteBuffer;
 /**
  * aac是PCM的编码后格式，h265则是YUY(Android相机回调的NV21数据)编码后的格式
  * 合并打包成为mp4视频文件
+ *
+ * h264和aac无法直接合成，需要将h264混合mpeg4包装成mp4（无音频）
+ * 将aac（无adts）混合成mpeg4包装的MP4（无视频）
+ * 最后将混合包装好的，重新分离并再生成新的视频
  */
 @RequiresApi(api = Build.VERSION_CODES.N)
 public class VideoHandleActivity extends AppCompatActivity {
@@ -48,7 +54,9 @@ public class VideoHandleActivity extends AppCompatActivity {
         public void onClick(View view) {
             if (mBinding.mergeVideo == view) {
                 // 合并视频
-
+                muxerAudio(getExternalCacheDir().getPath());
+                muxerVideo(getExternalCacheDir().getPath());
+                combineVideo(getExternalCacheDir().getPath());
             }
             if (mBinding.extractorVideo == view) {
                 // 分离视频
@@ -56,6 +64,223 @@ public class VideoHandleActivity extends AppCompatActivity {
             }
         }
     };
+
+    // aac包装成mp4，无视频
+    private void muxerAudio(String savePath) {
+        MediaMuxer audioMuxer;
+        MediaExtractor mediaExtractor = null;
+
+        try {
+            mediaExtractor = new MediaExtractor();
+            audioMuxer = new MediaMuxer(savePath + "/mux_audio.mp4",MediaMuxer.OutputFormat.MUXER_OUTPUT_MPEG_4);
+            AssetFileDescriptor fd = getResources().openRawResourceFd(R.raw.baby);
+            mediaExtractor.setDataSource(fd);
+            int trackCount = mediaExtractor.getTrackCount();
+            int audioTrackIndex = -1;
+            for (int i = 0;i < trackCount;i ++) {
+                MediaFormat mediaFormat = mediaExtractor.getTrackFormat(i);
+                String mineType = mediaFormat.getString(MediaFormat.KEY_MIME);
+                if (mineType.startsWith("audio/")) {
+                    audioTrackIndex = i;
+                }
+            }
+            ByteBuffer byteBuffer = ByteBuffer.allocate(500 * 1024);
+            MediaCodec.BufferInfo bufferInfo = new MediaCodec.BufferInfo();
+            mediaExtractor.selectTrack(audioTrackIndex);
+            MediaFormat mediaFormat = mediaExtractor.getTrackFormat(audioTrackIndex);
+            int writeAudioIndex = audioMuxer.addTrack(mediaFormat);
+            audioMuxer.start();
+            long sampleTime = 0;
+            long firstSampleTime = 0;
+            long secondSampleTime = 0;
+            mediaExtractor.readSampleData(byteBuffer,0);
+            firstSampleTime = mediaExtractor.getSampleTime();
+            mediaExtractor.advance();
+            secondSampleTime = mediaExtractor.getSampleTime();
+            sampleTime = Math.abs(secondSampleTime - firstSampleTime);
+
+            mediaExtractor.unselectTrack(audioTrackIndex);
+            mediaExtractor.selectTrack(audioTrackIndex);
+
+            while (true) {
+                int readSampleCount = mediaExtractor.readSampleData(byteBuffer,0);
+                if (readSampleCount < 0) {
+                    break;
+                }
+                bufferInfo.size = readSampleCount;
+                bufferInfo.offset = 0;
+                bufferInfo.flags = mediaExtractor.getSampleFlags();
+                bufferInfo.presentationTimeUs += sampleTime;
+                audioMuxer.writeSampleData(writeAudioIndex,byteBuffer,bufferInfo);
+                byteBuffer.clear();
+                mediaExtractor.advance();
+            }
+            audioMuxer.stop();
+            audioMuxer.release();
+            mediaExtractor.release();
+        }catch (Exception e){
+            e.printStackTrace();
+        }
+    }
+
+    /**
+     * h264包装成mp4，无音频
+     * @param savePath
+     */
+    private void muxerVideo(String savePath) {
+        MediaMuxer videoMuxer;
+        MediaExtractor mediaExtractor = null;
+
+        try {
+            mediaExtractor = new MediaExtractor();
+            videoMuxer = new MediaMuxer(savePath + "/mux_video.mp4",MediaMuxer.OutputFormat.MUXER_OUTPUT_MPEG_4);
+            AssetFileDescriptor fd = getResources().openRawResourceFd(R.raw.baby);
+            mediaExtractor.setDataSource(fd);
+            int trackCount = mediaExtractor.getTrackCount();
+            int videoTrackIndex = -1;
+            for (int i = 0;i < trackCount;i ++) {
+                MediaFormat trackFormat = mediaExtractor.getTrackFormat(i);
+                String mineType = trackFormat.getString(MediaFormat.KEY_MIME);
+                if (mineType.startsWith("video/")) {
+                    videoTrackIndex = i;
+                }
+            }
+
+            ByteBuffer byteBuffer = ByteBuffer.allocate(500 * 1024);
+            MediaCodec.BufferInfo bufferInfo = new MediaCodec.BufferInfo();
+
+            mediaExtractor.selectTrack(videoTrackIndex);
+            MediaFormat mediaFormat = mediaExtractor.getTrackFormat(videoTrackIndex);
+            int writeVideoIndex = videoMuxer.addTrack(mediaFormat);
+            videoMuxer.start();
+            long sampleTime = 0;
+            long firstSampleTime = 0;
+            long secondSampleTime = 0;
+            mediaExtractor.readSampleData(byteBuffer,0);
+            firstSampleTime = mediaExtractor.getSampleTime();
+            mediaExtractor.advance();
+            secondSampleTime = mediaExtractor.getSampleTime();
+            sampleTime = Math.abs(secondSampleTime - firstSampleTime);
+
+            mediaExtractor.unselectTrack(videoTrackIndex);
+            mediaExtractor.selectTrack(videoTrackIndex);
+            while (true) {
+                int readSampleCount = mediaExtractor.readSampleData(byteBuffer,0);
+                if (readSampleCount < 0) {
+                    break;
+                }
+                bufferInfo.size = readSampleCount;
+                bufferInfo.offset = 0;
+                bufferInfo.flags = mediaExtractor.getSampleFlags();
+                bufferInfo.presentationTimeUs += sampleTime;
+                videoMuxer.writeSampleData(writeVideoIndex,byteBuffer,bufferInfo);
+                byteBuffer.clear();
+                mediaExtractor.advance();
+            }
+
+            videoMuxer.stop();
+            videoMuxer.release();
+            mediaExtractor.release();
+        }catch (Exception e){
+            e.printStackTrace();
+        }
+    }
+
+    /**
+     * 合并上面aac和h264
+     * @param savePath
+     */
+    private void combineVideo(String savePath) {
+        MediaMuxer mediaMuxer;
+        MediaExtractor videoExtractor = null;
+        MediaExtractor audioExtractor = null;
+
+        try {
+            audioExtractor = new MediaExtractor();
+            videoExtractor = new MediaExtractor();
+            mediaMuxer = new MediaMuxer(savePath + "/mux_output.mp4",MediaMuxer.OutputFormat.MUXER_OUTPUT_MPEG_4);
+            videoExtractor.setDataSource(savePath + "/mux_video.mp4");
+            audioExtractor.setDataSource(savePath + "/mux_audio.mp4");
+            // 获取信道数
+            int trackCount = videoExtractor.getTrackCount();
+            int videoTrackIndex = -1;
+            for (int i = 0;i < trackCount;i ++) {
+                MediaFormat videoFormat = videoExtractor.getTrackFormat(i);
+                String mineType = videoFormat.getString(MediaFormat.KEY_MIME);
+                if (mineType.startsWith("video/")) {
+                    videoTrackIndex = i;
+                }
+            }
+            int audioTrackIndex = -1;
+            for (int i = 0;i < trackCount;i ++) {
+                MediaFormat audioFormat = audioExtractor.getTrackFormat(i);
+                String mineType = audioFormat.getString(MediaFormat.KEY_MIME);
+                if (mineType.startsWith("audio/")) {
+                    audioTrackIndex = i;
+                }
+            }
+
+            ByteBuffer byteBuffer = ByteBuffer.allocate(500 * 1024);
+            MediaCodec.BufferInfo audioBufferInfo = new MediaCodec.BufferInfo();
+            MediaCodec.BufferInfo videoBufferInfo = new MediaCodec.BufferInfo();
+
+            videoExtractor.selectTrack(videoTrackIndex);
+            audioExtractor.selectTrack(audioTrackIndex);
+
+            MediaFormat videoTrackFormat = videoExtractor.getTrackFormat(videoTrackIndex);
+            int writeVideoIndex = mediaMuxer.addTrack(videoTrackFormat);
+            MediaFormat audioTrackFormat = audioExtractor.getTrackFormat(audioTrackIndex);
+            int writeAudioIndex = mediaMuxer.addTrack(audioTrackFormat);
+
+            mediaMuxer.start();
+            long sampleTime = 0;
+            long firstSampleTime = 0;
+            long secondSampleTime = 0;
+
+            videoExtractor.readSampleData(byteBuffer,0);
+            firstSampleTime = videoExtractor.getSampleTime();
+            videoExtractor.advance();
+            secondSampleTime = videoExtractor.getSampleTime();
+            sampleTime = Math.abs(secondSampleTime - firstSampleTime);
+            videoExtractor.unselectTrack(videoTrackIndex);
+            videoExtractor.selectTrack(videoTrackIndex);
+            while (true) {
+                // 将无音频的视频分离，并混合入muxer
+                int readSampleCount = videoExtractor.readSampleData(byteBuffer,0);
+                if (readSampleCount < 0) {
+                    break;
+                }
+                audioBufferInfo.size = readSampleCount;
+                audioBufferInfo.offset = 0;
+                audioBufferInfo.flags = videoExtractor.getSampleFlags();
+                audioBufferInfo.presentationTimeUs += sampleTime;
+                mediaMuxer.writeSampleData(writeVideoIndex,byteBuffer,audioBufferInfo);
+                byteBuffer.clear();
+                videoExtractor.advance();
+            }
+            while (true) {
+                // 将无视频的音频分离，并混合入muxer
+                int readSampleCount = audioExtractor.readSampleData(byteBuffer,0);
+                if (readSampleCount < 0) {
+                    break;
+                }
+                videoBufferInfo.size = readSampleCount;
+                videoBufferInfo.offset = 0;
+                videoBufferInfo.flags = audioExtractor.getSampleFlags();
+                videoBufferInfo.presentationTimeUs += sampleTime;
+                mediaMuxer.writeSampleData(writeAudioIndex,byteBuffer,videoBufferInfo);
+                byteBuffer.clear();
+                audioExtractor.advance();
+            }
+
+            mediaMuxer.stop();
+            mediaMuxer.release();
+            audioExtractor.release();
+            videoExtractor.release();
+        }catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
 
     /**
      * 将视频分离成视频和音频
