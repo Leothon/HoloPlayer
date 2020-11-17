@@ -13,7 +13,7 @@ import androidx.core.app.ActivityCompat
 import com.holo.holoplayer.databinding.ActivityAudioHandleBinding
 import com.holo.holoplayer.utils.PcmToWavUtil
 import java.io.*
-import java.lang.Exception
+import java.nio.ByteBuffer
 
 /**
  * AudioRecord负责采集PCM数据，AudioTrack负责播放PCM数据
@@ -29,7 +29,7 @@ import java.lang.Exception
  */
 class AudioHandleActivity : AppCompatActivity() {
 
-    private var permissions: Array<String>? = arrayOf(Manifest.permission.RECORD_AUDIO,Manifest.permission.READ_EXTERNAL_STORAGE,Manifest.permission.WRITE_EXTERNAL_STORAGE)
+    private var permissions: Array<String>? = arrayOf(Manifest.permission.RECORD_AUDIO, Manifest.permission.READ_EXTERNAL_STORAGE, Manifest.permission.WRITE_EXTERNAL_STORAGE)
     private var mBinding: ActivityAudioHandleBinding? = null
 
     // 录音缓冲区
@@ -47,6 +47,17 @@ class AudioHandleActivity : AppCompatActivity() {
     private var mRecordThread: Thread? = null
     private var isStart: Boolean = false
 
+
+    private var encoderFormat: MediaFormat? = null;
+    private var encoder: MediaCodec? = null;
+    private var outputStream: FileOutputStream? = null;
+    private var info: MediaCodec.BufferInfo? = null;
+
+    private var perPcmSize = 0;
+    private var outByteBuffer: ByteArray? = null;
+    private var aacSampleRate = 4;
+    private var recordTime: Double = 0.0;
+    private var audioSampleRate = 0;
 
 
     companion object{
@@ -79,7 +90,7 @@ class AudioHandleActivity : AppCompatActivity() {
         private val mMode = AudioTrack.MODE_STREAM
 
         fun start(context: Context) {
-            context.startActivity(Intent(context,AudioHandleActivity::class.java))
+            context.startActivity(Intent(context, AudioHandleActivity::class.java))
         }
     }
 
@@ -116,6 +127,129 @@ class AudioHandleActivity : AppCompatActivity() {
         initMinBufferSize()
         initAudioRecord()
         initAudioTrack()
+        initMediaCodec(44100,File(this.externalCacheDir?.path, "audioRecord.aac"))
+    }
+
+
+    private fun initMediaCodec(sampleRate: Int, outFile: File) {
+        try {
+            aacSampleRate = getADTSSampleRate(sampleRate)
+            // 立体声
+            encoderFormat = MediaFormat.createAudioFormat(MediaFormat.MIMETYPE_AUDIO_AAC, sampleRate, 2)
+            encoderFormat?.setInteger(MediaFormat.KEY_BIT_RATE, 96000)
+            encoderFormat?.setInteger(MediaFormat.KEY_AAC_PROFILE, MediaCodecInfo.CodecProfileLevel.AACObjectLC)
+            encoderFormat?.setInteger(MediaFormat.KEY_MAX_INPUT_SIZE, 4096)
+            encoder = MediaCodec.createEncoderByType(MediaFormat.MIMETYPE_AUDIO_AAC)
+            info = MediaCodec.BufferInfo()
+            if (encoder == null) {
+                return
+            }
+            recordTime = 0.0
+            encoder?.configure(encoderFormat, null, null, MediaCodec.CONFIGURE_FLAG_ENCODE)
+            outputStream = FileOutputStream(outFile)
+            encoder?.start()
+        }catch (e: IOException) {
+            e.printStackTrace()
+        }
+    }
+
+    private fun encodecPcmToAAC(size: Int, buffer: ByteArray) {
+        // 录音时间，size/ 采样率*声道数 * bits/8
+        recordTime += size * 1.0 / (audioSampleRate * 2 * (16 / 8))
+        var inputBufferIndex: Int? = encoder?.dequeueInputBuffer(0)
+        if (inputBufferIndex != null) {
+            if (inputBufferIndex >= 0) {
+                var byteBuffer: ByteBuffer? = encoder?.inputBuffers?.get(inputBufferIndex)
+                byteBuffer?.clear()
+                byteBuffer?.put(buffer)
+                encoder?.queueInputBuffer(inputBufferIndex, 0, size, 0, 0);
+            }
+        }
+
+        var index: Int = encoder?.dequeueOutputBuffer(info!!, 0)!!
+
+        while (index >= 0) {
+            try {
+                perPcmSize = info?.size?.plus(7)!!
+                outByteBuffer = ByteArray(perPcmSize)
+
+                var byteBuffer: ByteBuffer? = index?.let { encoder?.outputBuffers?.get(it) }
+                byteBuffer?.position(info?.offset!!)
+                byteBuffer?.limit(info?.offset!! + info?.size!!)
+                addADTSHeader(outByteBuffer!!, perPcmSize, aacSampleRate)
+                byteBuffer?.get(outByteBuffer, 7, info?.size!!)
+                byteBuffer?.position(info?.offset!!)
+                outputStream?.write(outByteBuffer, 0, perPcmSize)
+
+                encoder?.releaseOutputBuffer(index!!, false)
+                index = encoder?.dequeueOutputBuffer(info!!, 0)!!
+                outByteBuffer = null
+            }catch (e: IOException) {
+                e.printStackTrace()
+            }
+        }
+    }
+
+
+    private fun addADTSHeader(packet: ByteArray, packetLen: Int, sampleRate: Int) {
+        var profile: Int = 2;
+        var freqIdx: Int = sampleRate;
+        var chanCfg: Int = 2;
+
+        packet[0] = 0xFF.toByte() // 0xFFF(12bit) 这里只取了8位，所以还差4位放到下一个里
+        packet[1] = 0xF9.toByte() // 第一个t位放F
+        packet[2] = ((profile - 1 shl 6) + (freqIdx shl 2) + (chanCfg shr 2)).toByte()
+        packet[3] = ((chanCfg and 3 shl 6) + (packetLen shr 11)).toByte()
+        packet[4] = (packetLen and 0x7FF shr 3).toByte()
+        packet[5] = ((packetLen and 7 shl 5) + 0x1F).toByte()
+        packet[6] = 0xFC.toByte()
+    }
+
+    private fun getADTSSampleRate(sampleRate: Int): Int {
+        var rate = 4
+        when (sampleRate) {
+            96000 -> {
+                rate = 0
+            }
+            88200 -> {
+                rate = 1
+            }
+            64000 -> {
+                rate = 2
+            }
+            48000 -> {
+                rate = 3
+            }
+            44100 -> {
+                rate = 4
+            }
+            32000 -> {
+                rate = 5
+            }
+            24000 -> {
+                rate = 6
+            }
+            22050 -> {
+                rate = 7
+            }
+            16000 -> {
+                rate = 8
+            }
+            12000 -> {
+                rate = 9
+            }
+            11025 -> {
+                rate = 10
+            }
+            8000 -> {
+                rate = 11
+            }
+            7350 -> {
+                rate = 12
+            }
+
+        }
+        return rate
     }
 
     /**
@@ -125,18 +259,18 @@ class AudioHandleActivity : AppCompatActivity() {
         // 第一个参数，采样率
         // 第二个参数，声道数.CHANNEL_CONFIGURATION_STEREO 双声道，CHANNEL_IN_MONO 单声道
         // 第三个参数，采样精度，16比特
-        mRecordBufferSize = AudioRecord.getMinBufferSize(8000,AudioFormat.CHANNEL_IN_MONO,AudioFormat.ENCODING_PCM_16BIT)
+        mRecordBufferSize = AudioRecord.getMinBufferSize(8000, AudioFormat.CHANNEL_IN_MONO, AudioFormat.ENCODING_PCM_16BIT)
         //指定采样率 （MediaRecorder 的采样率通常是8000Hz AAC的通常是44100Hz。 设置采样率为44100，目前为常用的采样率，官方文档表示这个值可以兼容所有的设置）
         mMinBufferSize = AudioTrack.getMinBufferSize(44100, AudioFormat.CHANNEL_OUT_MONO, AudioFormat.ENCODING_PCM_16BIT)
     }
 
     private fun initAudioRecord() {
         // 第一个参数，音频源，MIC代表麦克风
-        mAudioRecord = mRecordBufferSize?.let { AudioRecord(MediaRecorder.AudioSource.MIC,8000,AudioFormat.CHANNEL_IN_MONO,AudioFormat.ENCODING_PCM_16BIT, it) }
+        mAudioRecord = mRecordBufferSize?.let { AudioRecord(MediaRecorder.AudioSource.MIC, 8000, AudioFormat.CHANNEL_IN_MONO, AudioFormat.ENCODING_PCM_16BIT, it) }
     }
 
     private fun initAudioTrack() {
-        mAudioTrack = mMinBufferSize?.let { AudioTrack(mStreamType,44100,AudioFormat.CHANNEL_OUT_MONO,AudioFormat.ENCODING_PCM_16BIT, it, mMode) }
+        mAudioTrack = mMinBufferSize?.let { AudioTrack(mStreamType, 44100, AudioFormat.CHANNEL_OUT_MONO, AudioFormat.ENCODING_PCM_16BIT, it, mMode) }
     }
 
     private var runnable: Runnable = Runnable {
@@ -150,7 +284,9 @@ class AudioHandleActivity : AppCompatActivity() {
             // 实际上可以根据录制的状态来控制，但是延迟很高
             while (mIsRecord) {
                 // 如果正在录制，则通过audioRecord读取流
-                bytes?.let { mAudioRecord?.read(it,0, it.size) }
+                bytes?.let { mAudioRecord?.read(it, 0, it.size) }
+                // 通过mediaCodeC将PCM编码为aac，节省了很大的存储空间
+                bytes?.size?.let { encodecPcmToAAC(it,bytes) }
                 fileOutputStream.write(bytes)
                 fileOutputStream.flush()
             }
@@ -182,7 +318,7 @@ class AudioHandleActivity : AppCompatActivity() {
                         initAudioTrack()
                     }
                     mAudioTrack?.play()
-                    readCount?.let { tempBuffer?.let { it1 -> mAudioTrack?.write(it1,0, it) } }
+                    readCount?.let { tempBuffer?.let { it1 -> mAudioTrack?.write(it1, 0, it) } }
                 }
             }
             stopPlay();
@@ -210,15 +346,15 @@ class AudioHandleActivity : AppCompatActivity() {
     44-... 　　data 　　　　　　　　音频数据
      */
     private fun addHeadToWAV(){
-        pcmFile = File(this.externalCacheDir?.path,"audioRecord.pcm")
-        var handleWavFile = File(this.externalCacheDir?.path,"audioRecord_handle.wav")
-        var pcmToWavUtil = PcmToWavUtil(8000,AudioFormat.CHANNEL_IN_MONO,AudioFormat.ENCODING_PCM_16BIT)
-        pcmToWavUtil.pcmToWav(pcmFile.toString(),handleWavFile.toString())
+        pcmFile = File(this.externalCacheDir?.path, "audioRecord.pcm")
+        var handleWavFile = File(this.externalCacheDir?.path, "audioRecord_handle.wav")
+        var pcmToWavUtil = PcmToWavUtil(8000, AudioFormat.CHANNEL_IN_MONO, AudioFormat.ENCODING_PCM_16BIT)
+        pcmToWavUtil.pcmToWav(pcmFile.toString(), handleWavFile.toString())
     }
 
     private fun startRecord() {
         // 获取存储目录，创建文件
-        pcmFile = File(this.externalCacheDir?.path,"audioRecord.pcm")
+        pcmFile = File(this.externalCacheDir?.path, "audioRecord.pcm")
         mIsRecord = true
         // 开启新的线程进行录制
         Thread(runnable).start()
@@ -284,7 +420,7 @@ class AudioHandleActivity : AppCompatActivity() {
 
 
 
-    private fun checkPermission(permissions : Array<String>) {
+    private fun checkPermission(permissions: Array<String>) {
 
         val mPermissions: MutableList<String> = mutableListOf()
         for (i in permissions.indices) {
