@@ -25,13 +25,45 @@ public class JavaCode {
 //        orange.eat();
 //        banana.eat();
 
-        IFactory factoryApple = new AppleFactory();
-        Fruit apple = factoryApple.create();
-        apple.eat();
+//        IFactory factoryApple = new AppleFactory();
+//        Fruit apple = factoryApple.create();
+//        apple.eat();
+//
+//        IFactory factoryOrange = new OrangeFactory();
+//        Fruit orange = factoryOrange.create();
+//        orange.eat();
 
-        IFactory factoryOrange = new OrangeFactory();
-        Fruit orange = factoryOrange.create();
-        orange.eat();
+    }
+
+    public static boolean isStraight(int[] nums) {
+        Set<Integer> repeat = new HashSet<>();
+        int min = 14,max = 0;
+
+        for (int num : nums) {
+            if (num == 0) continue;
+            min = Math.min(min,num);
+            max = Math.max(max,num);
+            if (repeat.contains(num)) {
+                return false;
+            }
+            repeat.add(num);
+        }
+        return max - min < 5;
+    }
+
+    private static String reverseString(String s) {
+        StringBuilder stringBuilder = new StringBuilder();
+        char[] ch = s.toCharArray();
+        int n = ch.length;
+        for (int i = 0;i < n / 2;i ++) {
+            char temp = ch[i];
+            ch[i] = ch[n - 1 - i];
+            ch[n - 1 - i] = temp;
+        }
+        for (char c : ch) {
+            stringBuilder.append(c);
+        }
+        return stringBuilder.toString();
     }
 
     class ListNode {
@@ -43,6 +75,24 @@ public class JavaCode {
       }
     }
 
+    public class TreeNode {
+      int val;
+      TreeNode left;
+      TreeNode right;
+      TreeNode(int x) { val = x; }
+    }
+
+
+    public TreeNode helper(int[] nums,int left,int right) {
+        if (left > right) {
+            return null;
+        }
+        int mid = (right + left) / 2;
+        TreeNode root = new TreeNode(nums[mid]);
+        root.left = helper(nums,left,mid - 1);
+        root.right = helper(nums,mid + 1, right);
+        return root;
+    }
 
 //    public boolean hasCycle(ListNode head) {
 //        Set<ListNode> seen = new HashSet<>();
