@@ -44,13 +44,17 @@ class AudioHandleActivity : AppCompatActivity() {
 
     private var mAudioTrack: AudioTrack? = null
     private var mDataInputStream: DataInputStream? = null
+    private var mdecodeInputStream: DataInputStream? = null
     private var mRecordThread: Thread? = null
     private var isStart: Boolean = false
 
 
-    private var encoderFormat: MediaFormat? = null;
-    private var encoder: MediaCodec? = null;
-    private var outputStream: FileOutputStream? = null;
+    private var encoderFormat: MediaFormat? = null
+    private var decoderFormat: MediaFormat? = null
+    private var encoder: MediaCodec? = null
+    private var decoder: MediaCodec? = null
+    private var outputStreamAAC: FileOutputStream? = null;
+    private var outputStreamPCM: FileOutputStream? = null
     private var info: MediaCodec.BufferInfo? = null;
 
     private var perPcmSize = 0;
@@ -101,6 +105,7 @@ class AudioHandleActivity : AppCompatActivity() {
         permissions?.let { checkPermission(it) }
         mBinding?.startRecord?.setOnClickListener(onClickListener)
         mBinding?.startPlay?.setOnClickListener(onClickListener)
+        mBinding?.startDecode?.setOnClickListener(onClickListener)
         mBinding?.startPlay?.visibility = View.GONE
     }
 
@@ -120,6 +125,9 @@ class AudioHandleActivity : AppCompatActivity() {
                     startPlay(externalCacheDir?.path + "/audioRecord.pcm")
                 }
             }
+            mBinding?.startDecode -> {
+                decodeAAC()
+            }
         }
     }
 
@@ -127,11 +135,12 @@ class AudioHandleActivity : AppCompatActivity() {
         initMinBufferSize()
         initAudioRecord()
         initAudioTrack()
-        initMediaCodec(44100,File(this.externalCacheDir?.path, "audioRecord.aac"))
+        initMediaCodecEncoder(44100,File(this.externalCacheDir?.path, "audioRecordAAC.aac"))
+        initMediaCodecDecoder(44100, File(this.externalCacheDir?.path,"audioRecordPCM.pcm"))
     }
 
 
-    private fun initMediaCodec(sampleRate: Int, outFile: File) {
+    private fun initMediaCodecEncoder(sampleRate: Int, outFile: File) {
         try {
             aacSampleRate = getADTSSampleRate(sampleRate)
             // 立体声
@@ -146,14 +155,75 @@ class AudioHandleActivity : AppCompatActivity() {
             }
             recordTime = 0.0
             encoder?.configure(encoderFormat, null, null, MediaCodec.CONFIGURE_FLAG_ENCODE)
-            outputStream = FileOutputStream(outFile)
+            outputStreamAAC = FileOutputStream(outFile)
             encoder?.start()
         }catch (e: IOException) {
             e.printStackTrace()
         }
     }
 
-    private fun encodecPcmToAAC(size: Int, buffer: ByteArray) {
+    private fun initMediaCodecDecoder(sampleRate: Int,outFile: File) {
+        try {
+            decoderFormat = MediaFormat.createAudioFormat(MediaFormat.MIMETYPE_AUDIO_AAC,sampleRate,2)
+            decoderFormat?.setInteger(MediaFormat.KEY_BIT_RATE,96000)
+            decoderFormat?.setInteger(MediaFormat.KEY_AAC_PROFILE, MediaCodecInfo.CodecProfileLevel.AACObjectLC)
+            // 用来标记aac是否有adts
+            decoderFormat?.setInteger(MediaFormat.KEY_IS_ADTS,1)
+            decoder = MediaCodec.createDecoderByType(MediaFormat.MIMETYPE_AUDIO_AAC)
+            if (decoder == null) {
+                return
+            }
+            var data: ByteArray = byteArrayOf(0x11.toByte(), 0x90.toByte())
+            var csd_0: ByteBuffer = ByteBuffer.wrap(data)
+            decoderFormat?.setByteBuffer("csd-0",csd_0)
+            decoder?.configure(decoderFormat,null,null,0)
+            outputStreamPCM = FileOutputStream(outFile)
+            decoder?.start()
+        }catch (e: IOException) {
+            e.printStackTrace()
+        }
+    }
+
+    /**
+     * AAC解码为pcm
+     */
+    private fun decodeAACToPcm(size: Int, buffer: ByteArray) {
+        var inputBufferIndex: Int? = decoder?.dequeueInputBuffer(0)
+        if (inputBufferIndex != null) {
+            if (inputBufferIndex >= 0) {
+                var byteBuffer: ByteBuffer? = encoder?.inputBuffers?.get(inputBufferIndex)
+                byteBuffer?.clear()
+                byteBuffer?.put(buffer)
+                decoder?.queueInputBuffer(inputBufferIndex, 0, size, 0, 0);
+            }
+        }
+
+        var index: Int = decoder?.dequeueOutputBuffer(info!!, 0)!!
+
+        while (index >= 0) {
+            try {
+                outByteBuffer = ByteArray(perPcmSize)
+
+                var byteBuffer: ByteBuffer? = index?.let { decoder?.outputBuffers?.get(it) }
+                byteBuffer?.position(info?.offset!!)
+                byteBuffer?.limit(info?.offset!! + info?.size!!)
+                byteBuffer?.get(outByteBuffer, 7, info?.size!!)
+                byteBuffer?.position(info?.offset!!)
+                outputStreamPCM?.write(outByteBuffer, 0, perPcmSize)
+
+                decoder?.releaseOutputBuffer(index!!, false)
+                index = decoder?.dequeueOutputBuffer(info!!, 0)!!
+                outByteBuffer = null
+            }catch (e: IOException) {
+                e.printStackTrace()
+            }
+        }
+    }
+
+    /**
+     * pcm编码为aac
+     */
+    private fun encodePcmToAAC(size: Int, buffer: ByteArray) {
         // 录音时间，size/ 采样率*声道数 * bits/8
         recordTime += size * 1.0 / (audioSampleRate * 2 * (16 / 8))
         var inputBufferIndex: Int? = encoder?.dequeueInputBuffer(0)
@@ -179,7 +249,7 @@ class AudioHandleActivity : AppCompatActivity() {
                 addADTSHeader(outByteBuffer!!, perPcmSize, aacSampleRate)
                 byteBuffer?.get(outByteBuffer, 7, info?.size!!)
                 byteBuffer?.position(info?.offset!!)
-                outputStream?.write(outByteBuffer, 0, perPcmSize)
+                outputStreamAAC?.write(outByteBuffer, 0, perPcmSize)
 
                 encoder?.releaseOutputBuffer(index!!, false)
                 index = encoder?.dequeueOutputBuffer(info!!, 0)!!
@@ -286,7 +356,7 @@ class AudioHandleActivity : AppCompatActivity() {
                 // 如果正在录制，则通过audioRecord读取流
                 bytes?.let { mAudioRecord?.read(it, 0, it.size) }
                 // 通过mediaCodeC将PCM编码为aac，节省了很大的存储空间
-                bytes?.size?.let { encodecPcmToAAC(it,bytes) }
+                bytes?.size?.let { encodePcmToAAC(it,bytes) }
                 fileOutputStream.write(bytes)
                 fileOutputStream.flush()
             }
@@ -298,6 +368,32 @@ class AudioHandleActivity : AppCompatActivity() {
             e.printStackTrace()
             mAudioRecord?.stop()
         } catch (e: IOException) {
+            e.printStackTrace()
+        }
+    }
+
+    private var saveRunnable = Runnable {
+        try {
+            Process.setThreadPriority(Process.THREAD_PRIORITY_URGENT_AUDIO)
+            var tempBuffer: ByteArray? = mRecordBufferSize?.let { ByteArray(it) }
+            var readCount: Int? = 0
+            while (mdecodeInputStream?.available()!! > 0) {
+                readCount = mdecodeInputStream?.read(tempBuffer)
+                if (readCount == AudioTrack.ERROR_INVALID_OPERATION || readCount == AudioTrack.ERROR_BAD_VALUE) {
+                    continue;
+                }
+                tempBuffer?.size?.let { decodeAACToPcm(it,tempBuffer) }
+                if (readCount != 0 && readCount != -1) {
+                    // 未初始化
+//                    if (mAudioTrack?.state == AudioTrack.STATE_UNINITIALIZED) {
+//                        initAudioTrack()
+//                    }
+//                    mAudioTrack?.play()
+//                    readCount?.let { tempBuffer?.let { it1 -> mAudioTrack?.write(it1, 0, it) } }
+                }
+            }
+//            stopPlay();
+        }catch (e: Exception) {
             e.printStackTrace()
         }
     }
@@ -367,6 +463,11 @@ class AudioHandleActivity : AppCompatActivity() {
         mBinding?.showRecordStatus?.text = "录制已停止"
         mBinding?.startRecord?.text = "开始录制"
         mBinding?.startPlay?.visibility = View.VISIBLE
+    }
+
+    private fun decodeAAC() {
+        mdecodeInputStream = DataInputStream(FileInputStream(File(externalCacheDir?.path + "/audioRecordAAC.aac")))
+        Thread(saveRunnable).start()
     }
 
     private fun startPlay(path: String) {
