@@ -20,6 +20,7 @@ class MainActivity : AppCompatActivity(), View.OnClickListener {
         mBinding?.toCamera?.setOnClickListener(this)
         mBinding?.toVideo?.setOnClickListener(this)
         mBinding?.toOpenGl?.setOnClickListener(this)
+        mBinding?.toCustomCamera?.setOnClickListener(this)
     }
 
     @RequiresApi(Build.VERSION_CODES.N)
@@ -39,6 +40,9 @@ class MainActivity : AppCompatActivity(), View.OnClickListener {
            }
            mBinding?.toOpenGl -> {
                OpenGlEsActivity.start(this)
+           }
+           mBinding?.toCustomCamera -> {
+               CustomCameraActivity.start(this)
            }
        }
     }
