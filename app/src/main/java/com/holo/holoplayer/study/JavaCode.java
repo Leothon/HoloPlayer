@@ -35,6 +35,7 @@ public class JavaCode {
 
     }
 
+
     public static boolean isStraight(int[] nums) {
         Set<Integer> repeat = new HashSet<>();
         int min = 14,max = 0;
